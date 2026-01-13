@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Momentos GdeC - Minimal</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --bg: #f4f6f4;
+            --sage: #8da38d;
+            --text: #3d473d;
+            --accent: #e1e8e1;
+            --white: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Visualizador Sutil */
+        .viz-container {
+            width: 100%; height: 70px; display: flex; align-items: flex-end; 
+            justify-content: center; gap: 4px; padding-bottom: 10px;
+        }
+        .bar { width: 6px; height: 10px; background: var(--sage); border-radius: 3px; opacity: 0.3; }
+        .playing .bar { animation: move 1s infinite alternate; }
+        @keyframes move { from { height: 10px; } to { height: 40px; } }
+        .bar:nth-child(even) { animation-delay: 0.2s; }
+
+        .main-layout {
+            display: grid; grid-template-columns: 1fr 320px;
+            gap: 20px; padding: 0 20px 20px; flex-grow: 1; overflow: hidden;
+        }
+
+        @media (max-width: 768px) { .main-layout { grid-template-columns: 1fr; overflow-y: auto; } }
+
+        .list-container {
+            background: rgba(255,255,255,0.4); border-radius: 20px;
+            padding: 20px; display: flex; flex-direction: column; overflow-y: auto;
+        }
+
+        h2 { font-weight: 300; font-size: 1.1rem; color: var(--sage); margin-top: 0; letter-spacing: 1px; }
+
+        .track {
+            padding: 12px 15px; margin-bottom: 8px; background: var(--white);
+            border-radius: 12px; display: flex; justify-content: space-between; 
+            align-items: center; cursor: pointer; transition: 0.2s;
+        }
+        .track:hover { transform: translateX(5px); background: var(--accent); }
+        .track.active { border-left: 4px solid var(--sage); font-weight: bold; }
+
+        .add-icon { color: var(--sage); font-size: 1.2rem; opacity: 0.5; }
+        .add-icon:hover { opacity: 1; }
+
+        /* Controles Inferiores */
+        .footer {
+            background: var(--white); padding: 25px;
+            display: flex; flex-direction: column; align-items: center;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.02);
+        }
+
+        .controls { display: flex; align-items: center; gap: 40px; }
+        .play-btn { font-size: 2.8rem; color: var(--sage); cursor: pointer; }
+        .nav-btn { font-size: 1.3rem; color: var(--sage); cursor: pointer; opacity: 0.7; }
+
+        .prog-bg { width: 80%; max-width: 600px; height: 4px; background: var(--accent); margin-top: 15px; border-radius: 10px; cursor: pointer; }
+        .prog-fill { height: 100%; background: var(--sage); width: 0%; border-radius: 10px; }
+
+        .btn-play-selection {
+            background: var(--sage); color: white; border: none; padding: 10px;
+            border-radius: 10px; cursor: pointer; margin-top: 10px; width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="viz-container" id="visualizer">
+        <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+        <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+        <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+    </div>
+
+    <div class="main-layout">
+        <div class="list-container">
+            <h2>Biblioteca Momentos GdeC</h2>
+            <div id="library"></div>
+        </div>
+
+        <div class="list-container" style="background: rgba(141, 163, 141, 0.1);">
+            <h2>Mi Selección</h2>
+            <div id="queue" style="flex-grow:1"></div>
+            <button class="btn-play-selection" onclick="playQueue()">Reproducir Selección</button>
+            <button class="btn-play-selection" style="background:#cc8888; margin-top:5px" onclick="clearQueue()">Limpiar</button>
+        </div>
+    </div>
+
+    <div class="footer">
+        <div id="current-title" style="font-size:0.9rem; margin-bottom:10px; opacity:0.8">Selecciona una canción</div>
+        <div class="controls">
+            <i class="fas fa-backward nav-btn" onclick="prev()"></i>
+            <i class="fas fa-play-circle play-btn" id="playBtn"></i>
+            <i class="fas fa-forward nav-btn" onclick="next()"></i>
+        </div>
+        <div class="prog-bg" id="prog-cont"><div class="prog-fill" id="prog-fill"></div></div>
+    </div>
+
+    <audio id="audio"></audio>
+
+    <script>
+        const songs = [
+            { title: "El Vive", artist: "Varios", url: "https://www.dropbox.com/scl/fi/5zgedb9cobofgbclzei65/El-Vive.mp3?rlkey=s8f7r0v00swv10h0wc6klzzn3&st=04rdzy0o&raw=1" },
+            { title: "A ti sea la gloria", artist: "Coalo Zamorano", url: "https://www.dropbox.com/scl/fi/t0rvg0e5i59n4dcd5jvml/A-ti-sea-la-gloria-Coalo-Zamorano.mp3?rlkey=bcnkq0qs3mmn18owds6z72pge&st=ukfpzcp1&raw=1" },
+            { title: "Portador de tu Gloria", artist: "Alejandro del Bosque", url: "https://www.dropbox.com/scl/fi/wwyj82ct6vc19ruw40klm/Alejandro-del-Bosque-Portador-de-tu-Gloria.mp3?rlkey=lesogwkbsv9tyj7oh8a6lxfrp&st=umtjfxlo&raw=1" },
+            { title: "Aleluya por siempre", artist: "Yashira Guidini", url: "https://www.dropbox.com/scl/fi/5l08c3kwcakmvglckygkx/Aleluya-por-siempre-Yashira-Guidini-Letra-MP3_128K.mp3?rlkey=mk60hlj246xyp2217aqr4qwsr&st=lk4brs7m&raw=1" },
+            { title: "Victoria", artist: "Christine D'Clario", url: "https://www.dropbox.com/scl/fi/r3p8ex3j0s8hapflqeael/Christine-D_Clario-Victoria-Video-Oficial-_CDCEmanuel-MP3_128K.mp3?rlkey=bmk6x1t2cvtn073bapp9tjc2o&st=um2413l1&raw=1" },
+            { title: "Eres Mi Amigo Fiel", artist: "Coalo Zamorano", url: "https://www.dropbox.com/scl/fi/qkr35szv2rq90hjybx33t/Coalo-Zamorano-Eres-Mi-Amigo-Fiel-En-Vivo-1.mp3?rlkey=8w188j4zbg0uwpn35y8hgdccn&st=8u9xsgzx&raw=1" },
+            { title: "Cristo", artist: "Coalo Zamorano ft. Travy Joe", url: "https://www.dropbox.com/scl/fi/ks1het3g1o580ieskhoq4/Coalo-Zamorano-Cristo-Feat.-Travy-Joe-V-deo-Oficial-MP3_128K.mp3?rlkey=evg5j9wr5xqr3avsxc8qmu861&st=jj40ypxl&raw=1" }
+        ];
+
+        let myQueue = [];
+        let currentIdx = 0;
+        let isQueueMode = false;
+        const audio = document.getElementById('audio');
+        const playBtn = document.getElementById('playBtn');
+
+        // Render Biblioteca
+        const lib = document.getElementById('library');
+        songs.forEach((s, i) => {
+            const d = document.createElement('div');
+            d.className = 'track';
+            d.innerHTML = `<div>${s.title}<br><small style="opacity:0.6">${s.artist}</small></div>
+                           <i class="fas fa-plus-circle add-icon" onclick="event.stopPropagation(); addQ(${i})"></i>`;
+            d.onclick = () => playSingle(i);
+            lib.appendChild(d);
+        });
+
+        function addQ(i) {
+            myQueue.push(songs[i]);
+            renderQ();
+        }
+
+        function renderQ() {
+            const qDiv = document.getElementById('queue');
+            qDiv.innerHTML = myQueue.map((s, i) => `<div class="track" style="font-size:0.8rem"><span>${i+1}. ${s.title}</span><i class="fas fa-times" onclick="removeQ(${i})"></i></div>`).join('');
+        }
+
+        function removeQ(i) { myQueue.splice(i, 1); renderQ(); }
+        function clearQueue() { myQueue = []; renderQ(); isQueueMode = false; }
+
+        function playSingle(i) { isQueueMode = false; currentIdx = i; load(songs[i]); }
+        function playQueue() { if(myQueue.length>0){ isQueueMode=true; currentIdx=0; load(myQueue[0]); } }
+
+        function load(s) {
+            audio.src = s.url;
+            document.getElementById('current-title').innerText = s.title + " - " + s.artist;
+            audio.play();
+            updateUI(true);
+        }
+
+        function updateUI(p) {
+            playBtn.classList.toggle('fa-pause-circle', p);
+            playBtn.classList.toggle('fa-play-circle', !p);
+            document.getElementById('visualizer').classList.toggle('playing', p);
+        }
+
+        playBtn.onclick = () => {
+            if(!audio.src) return;
+            if(audio.paused) { audio.play(); updateUI(true); }
+            else { audio.pause(); updateUI(false); }
+        };
+
+        function next() {
+            const list = isQueueMode ? myQueue : songs;
+            currentIdx = (currentIdx + 1) % list.length;
+            load(list[currentIdx]);
+        }
+
+        function prev() {
+            const list = isQueueMode ? myQueue : songs;
+            currentIdx = (currentIdx - 1 + list.length) % list.length;
+            load(list[currentIdx]);
+        }
+
+        audio.ontimeupdate = () => {
+            document.getElementById('prog-fill').style.width = (audio.currentTime / audio.duration * 100) + '%';
+        };
+
+        audio.onended = next;
+        document.getElementById('prog-cont').onclick = (e) => {
+            const w = e.target.clientWidth || e.target.parentElement.clientWidth;
+            audio.currentTime = (e.offsetX / w) * audio.duration;
+        };
+    </script>
+</body>
+</html>
